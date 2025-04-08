@@ -27,23 +27,6 @@ If your GitHub organization uses SAML SSO (Single Sign-On):
 4. Click "Authorize" for your organization
 5. Complete the SAML authentication process if prompted
 
-### Providing the GitHub Token
-
-There are three ways to provide your GitHub token to the tool:
-
-1. **Command line flag (preferred):**
-   ```
-   ./release-notes-extractor --token=YOUR_TOKEN_HERE
-   ```
-
-2. **Environment variable:**
-   ```
-   export GITHUB_TOKEN=YOUR_TOKEN_HERE
-   ./release-notes-extractor
-   ```
-
-3. The tool will use the token stored in the code (if any), but this is not recommended.
-
 ## Installation and Usage
 
 1. Install the tool using Go:
@@ -51,10 +34,20 @@ There are three ways to provide your GitHub token to the tool:
    go install github.com/jespino/github-mm-release-notes@latest
    ```
 
-2. Run the tool:
+2. Run the tool with your GitHub token in one of these ways:
+
+   **Command line flag (preferred):**
    ```
-   github-mm-release-notes [--token=YOUR_GITHUB_TOKEN]
+   github-mm-release-notes --token=YOUR_TOKEN_HERE
    ```
+
+   **Environment variable:**
+   ```
+   export GITHUB_TOKEN=YOUR_TOKEN_HERE
+   github-mm-release-notes
+   ```
+
+   **Note:** The tool will fall back to using any token stored in the code (if any), but this is not recommended.
 
 3. Follow the interactive prompts:
    - Select a repository (mattermost/mattermost, mattermost/enterprise, or both)
