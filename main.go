@@ -12,6 +12,19 @@ import (
 	"strings"
 )
 
+// Mattermost Release Notes Extractor
+//
+// This tool helps extract release notes from GitHub pull requests in Mattermost repositories.
+// It retrieves PRs with the "release-note" label from selected milestones and displays their release notes.
+//
+// Usage:
+//   ./release-notes-extractor [--token=YOUR_GITHUB_TOKEN]
+//
+// Token can be provided in three ways (in order of precedence):
+//   1. Command line flag: --token=YOUR_TOKEN
+//   2. Environment variable: export GITHUB_TOKEN=YOUR_TOKEN
+//   3. Default token defined in the code (not recommended)
+
 // GitHub API structures
 type Milestone struct {
 	Number      int    `json:"number"`
