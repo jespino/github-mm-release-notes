@@ -48,6 +48,8 @@ If your GitHub organization uses SAML SSO (Single Sign-On):
    ```
 
    **Note:** The tool will fall back to using any token stored in the code (if any), but this is not recommended.
+   
+   **Important:** If you don't provide a GitHub token, the tool will run as an unauthenticated user. This will work for the public Mattermost repository, but you **won't be able to access** the private Enterprise repository.
 
 3. Follow the interactive prompts:
    - Select a repository (mattermost/mattermost, mattermost/enterprise, or both)
