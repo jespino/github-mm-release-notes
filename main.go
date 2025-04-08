@@ -17,6 +17,45 @@ type Milestone struct {
 	Number      int    `json:"number"`
 	Title       string `json:"title"`
 	Description string `json:"description"`
+	RepoURL     string `json:"-"` // Internal field, not from API
+}
+
+// unifyMilestonesByName combines milestones with the same title/name across repositories
+func unifyMilestonesByName(milestoneSets ...[]Milestone) []UnifiedMilestone {
+	// Map to hold milestones by title
+	milestoneMap := make(map[string]*UnifiedMilestone)
+	
+	// Process all milestone sets
+	for _, milestoneSet := range milestoneSets {
+		for _, milestone := range milestoneSet {
+			if existing, ok := milestoneMap[milestone.Title]; ok {
+				// Add to existing unified milestone
+				existing.Milestones = append(existing.Milestones, milestone)
+			} else {
+				// Create new unified milestone
+				milestoneMap[milestone.Title] = &UnifiedMilestone{
+					Title:       milestone.Title,
+					Description: milestone.Description,
+					Milestones:  []Milestone{milestone},
+				}
+			}
+		}
+	}
+	
+	// Convert map to slice
+	result := make([]UnifiedMilestone, 0, len(milestoneMap))
+	for _, unified := range milestoneMap {
+		result = append(result, *unified)
+	}
+	
+	return result
+}
+
+// UnifiedMilestone represents a milestone that may exist in multiple repositories
+type UnifiedMilestone struct {
+	Title       string      // Common name/title
+	Description string      // Description (from the first found milestone)
+	Milestones  []Milestone // Actual milestones from different repos
 }
 
 type PullRequest struct {
@@ -101,15 +140,33 @@ func main() {
 			fmt.Printf("Error getting milestones from mattermost/mattermost: %v\n", err1)
 			return
 		}
+		// Add repo URL to each milestone
+		for i := range mmMilestones {
+			mmMilestones[i].RepoURL = mattermostRepoURL
+		}
 
 		entMilestones, err2 := getMilestones(enterpriseRepoURL)
 		if err2 != nil {
 			fmt.Printf("Error getting milestones from mattermost/enterprise: %v\n", err2)
 			return
 		}
+		// Add repo URL to each milestone
+		for i := range entMilestones {
+			entMilestones[i].RepoURL = enterpriseRepoURL
+		}
 
 		repoName = "both repositories"
-		milestones = append(mmMilestones, entMilestones...)
+		
+		// Create unified milestones by name
+		unifiedMilestones := unifyMilestonesByName(mmMilestones, entMilestones)
+		
+		// Convert back to simple milestones for display and selection
+		for _, um := range unifiedMilestones {
+			// Use the first milestone as the representative for this name
+			representative := um.Milestones[0]
+			milestones = append(milestones, representative)
+		}
+		
 		err = nil
 	}
 
@@ -145,19 +202,41 @@ func main() {
 	var prs []PullRequest
 
 	if repoChoice == 3 {
-		// For "both repositories", search in both
-		mmPRs, err1 := getPRsWithReleaseNotes(mattermostRepoURL, selectedMilestone.Number)
-		if err1 != nil {
-			fmt.Printf("Error getting PRs from mattermost/mattermost: %v\n", err1)
-		} else {
-			prs = append(prs, mmPRs...)
+		// For "both repositories", we need to find all instances of this milestone name in all repos
+		// Get unified milestones again
+		mmMilestones, _ := getMilestones(mattermostRepoURL)
+		for i := range mmMilestones {
+			mmMilestones[i].RepoURL = mattermostRepoURL
 		}
-
-		entPRs, err2 := getPRsWithReleaseNotes(enterpriseRepoURL, selectedMilestone.Number)
-		if err2 != nil {
-			fmt.Printf("Error getting PRs from mattermost/enterprise: %v\n", err2)
-		} else {
-			prs = append(prs, entPRs...)
+		
+		entMilestones, _ := getMilestones(enterpriseRepoURL)
+		for i := range entMilestones {
+			entMilestones[i].RepoURL = enterpriseRepoURL
+		}
+		
+		unifiedMilestones := unifyMilestonesByName(mmMilestones, entMilestones)
+		
+		// Find the unified milestone that matches our selection
+		var targetMilestones []Milestone
+		for _, um := range unifiedMilestones {
+			if um.Title == selectedMilestone.Title {
+				targetMilestones = um.Milestones
+				break
+			}
+		}
+		
+		// Fetch PRs for each matching milestone
+		for _, milestone := range targetMilestones {
+			milePRs, err := getPRsWithReleaseNotes(milestone.RepoURL, milestone.Number)
+			if err != nil {
+				repoName := "mattermost/mattermost"
+				if milestone.RepoURL == enterpriseRepoURL {
+					repoName = "mattermost/enterprise"
+				}
+				fmt.Printf("Error getting PRs from %s: %v\n", repoName, err)
+			} else {
+				prs = append(prs, milePRs...)
+			}
 		}
 	} else {
 		// For a single repository
