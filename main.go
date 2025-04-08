@@ -38,6 +38,8 @@ const (
 	defaultAuthToken  = "" // Default token, lowest priority
 )
 
+var authToken string
+
 // getGitHubToken returns the GitHub API token from available sources in order of precedence:
 // 1. Command-line flag
 // 2. Environment variable
@@ -61,28 +63,28 @@ func getGitHubToken() string {
 
 func main() {
 	// Get GitHub token from available sources
-	authToken := getGitHubToken()
+	authToken = getGitHubToken()
 	// Select repository
 	fmt.Println("Select a repository:")
 	fmt.Println("1: mattermost/mattermost")
 	fmt.Println("2: mattermost/enterprise")
 	fmt.Println("3: Both")
-	
+
 	reader := bufio.NewReader(os.Stdin)
 	fmt.Print("\nSelect an option (1-3): ")
 	repoInput, _ := reader.ReadString('\n')
 	repoInput = strings.TrimSpace(repoInput)
-	
+
 	repoChoice, err := strconv.Atoi(repoInput)
 	if err != nil || repoChoice < 1 || repoChoice > 3 {
 		fmt.Println("Invalid selection")
 		return
 	}
-	
+
 	var repoURL string
 	var repoName string
 	var milestones []Milestone
-	
+
 	switch repoChoice {
 	case 1:
 		repoURL = mattermostRepoURL
@@ -99,23 +101,23 @@ func main() {
 			fmt.Printf("Error getting milestones from mattermost/mattermost: %v\n", err1)
 			return
 		}
-		
+
 		entMilestones, err2 := getMilestones(enterpriseRepoURL)
 		if err2 != nil {
 			fmt.Printf("Error getting milestones from mattermost/enterprise: %v\n", err2)
 			return
 		}
-		
+
 		repoName = "both repositories"
 		milestones = append(mmMilestones, entMilestones...)
 		err = nil
 	}
-	
+
 	if err != nil {
 		fmt.Printf("Error getting milestones: %v\n", err)
 		return
 	}
-	
+
 	fmt.Printf("\nWorking with %s\n", repoName)
 
 	// Display milestones for selection
@@ -129,7 +131,7 @@ func main() {
 	fmt.Print("\nSelect a milestone (number): ")
 	input, _ := reader.ReadString('\n')
 	input = strings.TrimSpace(input)
-	
+
 	index, err := strconv.Atoi(input)
 	if err != nil || index < 1 || index > len(milestones) {
 		fmt.Println("Invalid selection")
@@ -141,7 +143,7 @@ func main() {
 
 	// Get PRs with "release-note" label for the selected milestone
 	var prs []PullRequest
-	
+
 	if repoChoice == 3 {
 		// For "both repositories", search in both
 		mmPRs, err1 := getPRsWithReleaseNotes(mattermostRepoURL, selectedMilestone.Number)
@@ -150,7 +152,7 @@ func main() {
 		} else {
 			prs = append(prs, mmPRs...)
 		}
-		
+
 		entPRs, err2 := getPRsWithReleaseNotes(enterpriseRepoURL, selectedMilestone.Number)
 		if err2 != nil {
 			fmt.Printf("Error getting PRs from mattermost/enterprise: %v\n", err2)
@@ -183,66 +185,66 @@ func main() {
 // Gets all open milestones from the specified repository
 func getMilestones(repoURL string) ([]Milestone, error) {
 	url := fmt.Sprintf("%s/milestones?state=open", repoURL)
-	
+
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	if authToken != "" {
 		req.Header.Set("Authorization", "Bearer "+authToken)
 	}
 	req.Header.Set("Accept", "application/vnd.github.v3+json")
-	
+
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("API responded with code: %d", resp.StatusCode)
 	}
-	
+
 	var milestones []Milestone
 	if err := json.NewDecoder(resp.Body).Decode(&milestones); err != nil {
 		return nil, err
 	}
-	
+
 	return milestones, nil
 }
 
 // Gets PRs with "release-note" label for a specific milestone
 func getPRsWithReleaseNotes(repoURL string, milestoneID int) ([]PullRequest, error) {
 	url := fmt.Sprintf("%s/issues?milestone=%d&state=all&labels=release-note", repoURL, milestoneID)
-	
+
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	if authToken != "" {
 		req.Header.Set("Authorization", "Bearer "+authToken)
 	}
 	req.Header.Set("Accept", "application/vnd.github.v3+json")
-	
+
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("API responded with code: %d", resp.StatusCode)
 	}
-	
+
 	var prs []PullRequest
 	if err := json.NewDecoder(resp.Body).Decode(&prs); err != nil {
 		return nil, err
 	}
-	
+
 	var pullRequests []PullRequest
 	for _, pr := range prs {
 		// Verify if it's a PR (not an issue) and has a milestone
@@ -250,7 +252,7 @@ func getPRsWithReleaseNotes(repoURL string, milestoneID int) ([]PullRequest, err
 			pullRequests = append(pullRequests, pr)
 		}
 	}
-	
+
 	return pullRequests, nil
 }
 
@@ -259,43 +261,43 @@ func extractReleaseNote(body string) string {
 	if body == "" {
 		return "No release note found"
 	}
-	
+
 	// Try different release note formats
-	
+
 	// Format 1: ```release-note ... ```
 	re1 := regexp.MustCompile("(?s)```release-note\n(.*?)\n```")
 	matches1 := re1.FindStringSubmatch(body)
 	if len(matches1) >= 2 {
 		return strings.TrimSpace(matches1[1])
 	}
-	
+
 	// Format 2: ```release-note ... ``` (with spaces)
 	re2 := regexp.MustCompile("(?s)```\\s*release-note\\s*\n(.*?)\n\\s*```")
 	matches2 := re2.FindStringSubmatch(body)
 	if len(matches2) >= 2 {
 		return strings.TrimSpace(matches2[1])
 	}
-	
+
 	// Format 3: ### Release Note ... ###
 	re3 := regexp.MustCompile("(?s)###\\s*Release Note\\s*\n(.*?)(\n###|\n$)")
 	matches3 := re3.FindStringSubmatch(body)
 	if len(matches3) >= 2 {
 		return strings.TrimSpace(matches3[1])
 	}
-	
+
 	// Format 4: release-note: ...
 	re4 := regexp.MustCompile("(?s)release-note:\\s*(.*?)(\n\n|\n$)")
 	matches4 := re4.FindStringSubmatch(body)
 	if len(matches4) >= 2 {
 		return strings.TrimSpace(matches4[1])
 	}
-	
+
 	// Try to extract any paragraph with "release note" mentioned
 	re5 := regexp.MustCompile("(?i)(?s)(?:release notes?|release changes?)[:\\s]+(.*?)(\n\n|\n$)")
 	matches5 := re5.FindStringSubmatch(body)
 	if len(matches5) >= 2 {
 		return strings.TrimSpace(matches5[1])
 	}
-	
+
 	return "No release note found in expected format"
 }
