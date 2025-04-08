@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"net/http"
 	"os"
@@ -34,10 +35,33 @@ type PullRequest struct {
 const (
 	mattermostRepoURL = "https://api.github.com/repos/mattermost/mattermost"
 	enterpriseRepoURL = "https://api.github.com/repos/mattermost/enterprise"
-	authToken         = "" // Add your GitHub token here
+	defaultAuthToken  = "" // Default token, lowest priority
 )
 
+// getGitHubToken returns the GitHub API token from available sources in order of precedence:
+// 1. Command-line flag
+// 2. Environment variable
+// 3. Default token defined in the code
+func getGitHubToken() string {
+	var flagToken string
+	flag.StringVar(&flagToken, "token", "", "GitHub API token")
+	flag.Parse()
+
+	// Check sources in order of precedence
+	if flagToken != "" {
+		return flagToken
+	}
+
+	if envToken := os.Getenv("GITHUB_TOKEN"); envToken != "" {
+		return envToken
+	}
+
+	return defaultAuthToken
+}
+
 func main() {
+	// Get GitHub token from available sources
+	authToken := getGitHubToken()
 	// Select repository
 	fmt.Println("Select a repository:")
 	fmt.Println("1: mattermost/mattermost")
@@ -166,7 +190,7 @@ func getMilestones(repoURL string) ([]Milestone, error) {
 	}
 	
 	if authToken != "" {
-		req.Header.Set("Authorization", "token "+authToken)
+		req.Header.Set("Authorization", "Bearer "+authToken)
 	}
 	req.Header.Set("Accept", "application/vnd.github.v3+json")
 	
@@ -199,7 +223,7 @@ func getPRsWithReleaseNotes(repoURL string, milestoneID int) ([]PullRequest, err
 	}
 	
 	if authToken != "" {
-		req.Header.Set("Authorization", "token "+authToken)
+		req.Header.Set("Authorization", "Bearer "+authToken)
 	}
 	req.Header.Set("Accept", "application/vnd.github.v3+json")
 	
