@@ -44,16 +44,16 @@ There are three ways to provide your GitHub token to the tool:
 
 3. The tool will use the token stored in the code (if any), but this is not recommended.
 
-## Usage
+## Installation and Usage
 
-1. Build the tool:
+1. Install the tool using Go:
    ```
-   go build -o release-notes-extractor main.go
+   go install github.com/jespino/github-mm-release-notes@latest
    ```
 
 2. Run the tool:
    ```
-   ./release-notes-extractor [--token=YOUR_GITHUB_TOKEN]
+   github-mm-release-notes [--token=YOUR_GITHUB_TOKEN]
    ```
 
 3. Follow the interactive prompts:
