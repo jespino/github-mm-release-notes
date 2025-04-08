@@ -19,11 +19,13 @@ type Milestone struct {
 }
 
 type PullRequest struct {
-	Number      int    `json:"number"`
-	Title       string `json:"title"`
-	Body        string `json:"body"`
-	MilestoneID int    `json:"milestone"`
-	Labels      []struct {
+	Number    int    `json:"number"`
+	Title     string `json:"title"`
+	Body      string `json:"body"`
+	Milestone *struct {
+		Number int `json:"number"`
+	} `json:"milestone"`
+	Labels []struct {
 		Name string `json:"name"`
 	} `json:"labels"`
 }
@@ -219,8 +221,8 @@ func getPRsWithReleaseNotes(repoURL string, milestoneID int) ([]PullRequest, err
 	
 	var pullRequests []PullRequest
 	for _, pr := range prs {
-		// Verificar si es un PR y no un issue
-		if strings.Contains(fmt.Sprintf("%s/pull/%d", repoURL, pr.Number), "pull") {
+		// Verificar si es un PR y no un issue y tiene un milestone
+		if strings.Contains(fmt.Sprintf("%s/pull/%d", repoURL, pr.Number), "pull") && pr.Milestone != nil {
 			pullRequests = append(pullRequests, pr)
 		}
 	}
