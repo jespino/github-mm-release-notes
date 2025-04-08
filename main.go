@@ -287,7 +287,7 @@ func getMilestones(repoURL string) ([]Milestone, error) {
 	}
 
 	if authToken != "" {
-		req.Header.Set("Authorization", "token "+authToken)
+		req.Header.Set("Authorization", "Bearer "+authToken)
 	}
 	req.Header.Set("Accept", "application/vnd.github.v3+json")
 
@@ -324,7 +324,7 @@ func getPRsWithReleaseNotes(repoURL string, milestoneID int) ([]PullRequest, err
 	}
 
 	if authToken != "" {
-		req.Header.Set("Authorization", "token "+authToken)
+		req.Header.Set("Authorization", "Bearer "+authToken)
 	}
 	req.Header.Set("Accept", "application/vnd.github.v3+json")
 
