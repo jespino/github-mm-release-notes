@@ -79,6 +79,14 @@ const (
 
 var authToken string
 
+// max returns the larger of x or y
+func max(x, y int) int {
+	if x > y {
+		return x
+	}
+	return y
+}
+
 // getGitHubToken returns the GitHub API token from available sources in order of precedence:
 // 1. Command-line flag
 // 2. Environment variable
@@ -103,6 +111,14 @@ func getGitHubToken() string {
 func main() {
 	// Get GitHub token from available sources
 	authToken = getGitHubToken()
+	
+	if authToken == "" {
+		fmt.Println("Warning: No GitHub token found. Access to private repositories will fail.")
+	} else {
+		tokenLength := len(authToken)
+		fmt.Printf("Using GitHub token (last 4 chars: %s)\n", 
+			authToken[max(0, tokenLength-4):tokenLength])
+	}
 	// Select repository
 	fmt.Println("Select a repository:")
 	fmt.Println("1: mattermost/mattermost")
@@ -271,7 +287,7 @@ func getMilestones(repoURL string) ([]Milestone, error) {
 	}
 
 	if authToken != "" {
-		req.Header.Set("Authorization", "Bearer "+authToken)
+		req.Header.Set("Authorization", "token "+authToken)
 	}
 	req.Header.Set("Accept", "application/vnd.github.v3+json")
 
@@ -283,7 +299,11 @@ func getMilestones(repoURL string) ([]Milestone, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("API responded with code: %d", resp.StatusCode)
+		// Read error response body for more details
+		errorBody := make([]byte, 1024)
+		n, _ := resp.Body.Read(errorBody)
+		return nil, fmt.Errorf("API responded with code: %d for URL %s - Response: %s", 
+			resp.StatusCode, url, string(errorBody[:n]))
 	}
 
 	var milestones []Milestone
@@ -304,7 +324,7 @@ func getPRsWithReleaseNotes(repoURL string, milestoneID int) ([]PullRequest, err
 	}
 
 	if authToken != "" {
-		req.Header.Set("Authorization", "Bearer "+authToken)
+		req.Header.Set("Authorization", "token "+authToken)
 	}
 	req.Header.Set("Accept", "application/vnd.github.v3+json")
 
@@ -316,7 +336,11 @@ func getPRsWithReleaseNotes(repoURL string, milestoneID int) ([]PullRequest, err
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("API responded with code: %d", resp.StatusCode)
+		// Read error response body for more details
+		errorBody := make([]byte, 1024)
+		n, _ := resp.Body.Read(errorBody)
+		return nil, fmt.Errorf("API responded with code: %d for URL %s - Response: %s", 
+			resp.StatusCode, url, string(errorBody[:n]))
 	}
 
 	var prs []PullRequest
