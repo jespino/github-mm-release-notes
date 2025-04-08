@@ -99,7 +99,7 @@ func main() {
 	}
 
 	// Permitir al usuario seleccionar un milestone
-	reader := bufio.NewReader(os.Stdin)
+	reader = bufio.NewReader(os.Stdin)
 	fmt.Print("\nSelecciona un milestone (número): ")
 	input, _ := reader.ReadString('\n')
 	input = strings.TrimSpace(input)
