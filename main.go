@@ -28,19 +28,69 @@ type PullRequest struct {
 	} `json:"labels"`
 }
 
-// URL base para la API de GitHub - ajusta el owner/repo según tu necesidad
+// URLs para los repositorios de Mattermost
 const (
-	apiBaseURL = "https://api.github.com/repos/OWNER/REPO"
-	authToken  = "" // Añade tu token de GitHub aquí
+	mattermostRepoURL = "https://api.github.com/repos/mattermost/mattermost"
+	enterpriseRepoURL = "https://api.github.com/repos/mattermost/enterprise"
+	authToken         = "" // Añade tu token de GitHub aquí
 )
 
 func main() {
-	// Obtener todos los milestones
-	milestones, err := getMilestones()
+	// Seleccionar repositorio
+	fmt.Println("Selecciona un repositorio:")
+	fmt.Println("1: mattermost/mattermost")
+	fmt.Println("2: mattermost/enterprise")
+	fmt.Println("3: Ambos")
+	
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Print("\nSelecciona una opción (1-3): ")
+	repoInput, _ := reader.ReadString('\n')
+	repoInput = strings.TrimSpace(repoInput)
+	
+	repoChoice, err := strconv.Atoi(repoInput)
+	if err != nil || repoChoice < 1 || repoChoice > 3 {
+		fmt.Println("Selección inválida")
+		return
+	}
+	
+	var repoURL string
+	var repoName string
+	var milestones []Milestone
+	
+	switch repoChoice {
+	case 1:
+		repoURL = mattermostRepoURL
+		repoName = "mattermost/mattermost"
+		milestones, err = getMilestones(repoURL)
+	case 2:
+		repoURL = enterpriseRepoURL
+		repoName = "mattermost/enterprise"
+		milestones, err = getMilestones(repoURL)
+	case 3:
+		// Obtener milestones de ambos repositorios y combinarlos
+		mmMilestones, err1 := getMilestones(mattermostRepoURL)
+		if err1 != nil {
+			fmt.Printf("Error al obtener milestones de mattermost/mattermost: %v\n", err1)
+			return
+		}
+		
+		entMilestones, err2 := getMilestones(enterpriseRepoURL)
+		if err2 != nil {
+			fmt.Printf("Error al obtener milestones de mattermost/enterprise: %v\n", err2)
+			return
+		}
+		
+		repoName = "ambos repositorios"
+		milestones = append(mmMilestones, entMilestones...)
+		err = nil
+	}
+	
 	if err != nil {
 		fmt.Printf("Error al obtener milestones: %v\n", err)
 		return
 	}
+	
+	fmt.Printf("\nTrabajando con %s\n", repoName)
 
 	// Mostrar milestones para selección
 	fmt.Println("Milestones disponibles:")
@@ -64,10 +114,30 @@ func main() {
 	fmt.Printf("\nMilestone seleccionado: %s\n\n", selectedMilestone.Title)
 
 	// Obtener PRs con etiqueta "release-note" para el milestone seleccionado
-	prs, err := getPRsWithReleaseNotes(selectedMilestone.Number)
-	if err != nil {
-		fmt.Printf("Error al obtener PRs: %v\n", err)
-		return
+	var prs []PullRequest
+	
+	if repoChoice == 3 {
+		// Para "ambos repositorios", buscar en los dos
+		mmPRs, err1 := getPRsWithReleaseNotes(mattermostRepoURL, selectedMilestone.Number)
+		if err1 != nil {
+			fmt.Printf("Error al obtener PRs de mattermost/mattermost: %v\n", err1)
+		} else {
+			prs = append(prs, mmPRs...)
+		}
+		
+		entPRs, err2 := getPRsWithReleaseNotes(enterpriseRepoURL, selectedMilestone.Number)
+		if err2 != nil {
+			fmt.Printf("Error al obtener PRs de mattermost/enterprise: %v\n", err2)
+		} else {
+			prs = append(prs, entPRs...)
+		}
+	} else {
+		// Para un solo repositorio
+		prs, err = getPRsWithReleaseNotes(repoURL, selectedMilestone.Number)
+		if err != nil {
+			fmt.Printf("Error al obtener PRs: %v\n", err)
+			return
+		}
 	}
 
 	// Imprimir información de cada PR y sus notas de release
@@ -84,9 +154,9 @@ func main() {
 	}
 }
 
-// Obtiene todos los milestones abiertos del repositorio
-func getMilestones() ([]Milestone, error) {
-	url := fmt.Sprintf("%s/milestones?state=open", apiBaseURL)
+// Obtiene todos los milestones abiertos del repositorio especificado
+func getMilestones(repoURL string) ([]Milestone, error) {
+	url := fmt.Sprintf("%s/milestones?state=open", repoURL)
 	
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -118,8 +188,8 @@ func getMilestones() ([]Milestone, error) {
 }
 
 // Obtiene PRs con etiqueta "release-note" para un milestone específico
-func getPRsWithReleaseNotes(milestoneID int) ([]PullRequest, error) {
-	url := fmt.Sprintf("%s/issues?milestone=%d&state=all&labels=release-note", apiBaseURL, milestoneID)
+func getPRsWithReleaseNotes(repoURL string, milestoneID int) ([]PullRequest, error) {
+	url := fmt.Sprintf("%s/issues?milestone=%d&state=all&labels=release-note", repoURL, milestoneID)
 	
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -150,7 +220,7 @@ func getPRsWithReleaseNotes(milestoneID int) ([]PullRequest, error) {
 	var pullRequests []PullRequest
 	for _, pr := range prs {
 		// Verificar si es un PR y no un issue
-		if strings.Contains(fmt.Sprintf("%s/pull/%d", apiBaseURL, pr.Number), "pull") {
+		if strings.Contains(fmt.Sprintf("%s/pull/%d", repoURL, pr.Number), "pull") {
 			pullRequests = append(pullRequests, pr)
 		}
 	}
