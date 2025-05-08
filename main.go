@@ -563,7 +563,9 @@ Only include categories that have at least one entry. Format your response as ma
 	resp, err := client.Messages.New(context.Background(), anthropic.MessageNewParams{
 		Model:     "claude-3-opus-20240229",
 		MaxTokens: 4000,
-		System:    "You organize release notes into categories like: Compatibility, Important Upgrade Notes, UI Improvements, etc.",
+		System:    []anthropic.TextBlockParam{
+			{Text: "You organize release notes into categories like: Compatibility, Important Upgrade Notes, UI Improvements, etc."},
+		},
 		Messages: []anthropic.MessageParam{
 			{
 				Role: anthropic.MessageParamRoleUser,
