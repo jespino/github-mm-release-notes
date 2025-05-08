@@ -534,7 +534,7 @@ func getPRsWithReleaseNotes(repoURL string, milestoneID int) ([]PullRequest, err
 // formatReleaseNotesWithClaude sends the release notes to Anthropic's Claude API
 // and returns the formatted version organized by categories
 func formatReleaseNotesWithClaude(apiKey string, releaseNotes string, milestoneName string) (string, error) {
-	client := anthropic.NewClient(apiKey)
+	client := anthropic.NewClient(anthropic.WithAPIKey(apiKey))
 
 	// Prepare the prompt for Claude
 	prompt := fmt.Sprintf(`Here are the raw release notes for Mattermost milestone %s:
@@ -557,20 +557,26 @@ Please remove the PR numbers and ticket titles. Then, please polish each release
 
 Only include categories that have at least one entry. Format your response as markdown.`, milestoneName, releaseNotes)
 
-	// Set up the message request
-	req := &anthropic.MessageRequest{
-		Model:     anthropic.Claude3Opus,
-		MaxTokens: 4000,
-		Messages: []anthropic.Message{
-			{
-				Role:    "user",
-				Content: prompt,
+	// Send the request to Claude using the right API version
+	resp, err := client.Messages.Create(
+		&anthropic.MessageCreateParams{
+			Model:    "claude-3-opus-20240229",
+			MaxTokens: 4000,
+			System:   "You organize release notes into categories like: Compatibility, Important Upgrade Notes, UI Improvements, etc.",
+			Messages: []anthropic.Message{
+				{
+					Role:    "user",
+					Content: []anthropic.ContentBlock{
+						anthropic.TextBlock{
+							Type: "text",
+							Text: prompt,
+						},
+					},
+				},
 			},
 		},
-	}
+	)
 
-	// Send the request to Claude
-	resp, err := client.Messages(req)
 	if err != nil {
 		return "", fmt.Errorf("error calling Claude API: %w", err)
 	}
@@ -580,7 +586,13 @@ Only include categories that have at least one entry. Format your response as ma
 		return "", fmt.Errorf("received empty response from Claude API")
 	}
 
-	return resp.Content[0].Text, nil
+	// Extract text from the content block
+	textBlock, ok := resp.Content[0].GetTextBlock()
+	if !ok {
+		return "", fmt.Errorf("could not parse text response from Claude API")
+	}
+
+	return textBlock.Text, nil
 }
 
 // Extracts the release note section from the PR description
