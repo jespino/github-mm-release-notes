@@ -140,15 +140,16 @@ func main() {
 	fmt.Println("2: mattermost/enterprise")
 	fmt.Println("3: mattermost/mattermost-mobile")
 	fmt.Println("4: mattermost/mattermost-desktop")
-	fmt.Println("5: All repositories")
+	fmt.Println("5: mattermost/mattermost + mattermost/enterprise")
+	fmt.Println("6: All repositories")
 
 	reader := bufio.NewReader(os.Stdin)
-	fmt.Print("\nSelect an option (1-5): ")
+	fmt.Print("\nSelect an option (1-6): ")
 	repoInput, _ := reader.ReadString('\n')
 	repoInput = strings.TrimSpace(repoInput)
 
 	repoChoice, err := strconv.Atoi(repoInput)
-	if err != nil || repoChoice < 1 || repoChoice > 5 {
+	if err != nil || repoChoice < 1 || repoChoice > 6 {
 		fmt.Println("Invalid selection")
 		return
 	}
@@ -175,6 +176,41 @@ func main() {
 		repoName = "mattermost/mattermost-desktop"
 		milestones, err = getMilestones(repoURL)
 	case 5:
+		// Get milestones from mattermost and enterprise repositories
+		mmMilestones, err1 := getMilestones(mattermostRepoURL)
+		if err1 != nil {
+			fmt.Printf("Error getting milestones from mattermost/mattermost: %v\n", err1)
+			return
+		}
+		// Add repo URL to each milestone
+		for i := range mmMilestones {
+			mmMilestones[i].RepoURL = mattermostRepoURL
+		}
+
+		entMilestones, err2 := getMilestones(enterpriseRepoURL)
+		if err2 != nil {
+			fmt.Printf("Error getting milestones from mattermost/enterprise: %v\n", err2)
+			return
+		}
+		// Add repo URL to each milestone
+		for i := range entMilestones {
+			entMilestones[i].RepoURL = enterpriseRepoURL
+		}
+
+		repoName = "mattermost/mattermost + mattermost/enterprise"
+		
+		// Create unified milestones by name
+		unifiedMilestones := unifyMilestonesByName(mmMilestones, entMilestones)
+		
+		// Convert back to simple milestones for display and selection
+		for _, um := range unifiedMilestones {
+			// Use the first milestone as the representative for this name
+			representative := um.Milestones[0]
+			milestones = append(milestones, representative)
+		}
+		
+		err = nil
+	case 6:
 		// Get milestones from all repositories and combine them
 		mmMilestones, err1 := getMilestones(mattermostRepoURL)
 		if err1 != nil {
@@ -263,6 +299,43 @@ func main() {
 	var prs []PullRequest
 
 	if repoChoice == 5 {
+		// For "mattermost+enterprise", we need to find all instances of this milestone name in these repos
+		// Get unified milestones again
+		mmMilestones, _ := getMilestones(mattermostRepoURL)
+		for i := range mmMilestones {
+			mmMilestones[i].RepoURL = mattermostRepoURL
+		}
+		
+		entMilestones, _ := getMilestones(enterpriseRepoURL)
+		for i := range entMilestones {
+			entMilestones[i].RepoURL = enterpriseRepoURL
+		}
+		
+		unifiedMilestones := unifyMilestonesByName(mmMilestones, entMilestones)
+		
+		// Find the unified milestone that matches our selection
+		var targetMilestones []Milestone
+		for _, um := range unifiedMilestones {
+			if um.Title == selectedMilestone.Title {
+				targetMilestones = um.Milestones
+				break
+			}
+		}
+		
+		// Fetch PRs for each matching milestone
+		for _, milestone := range targetMilestones {
+			milePRs, err := getPRsWithReleaseNotes(milestone.RepoURL, milestone.Number)
+			if err != nil {
+				repoName := "mattermost/mattermost"
+				if milestone.RepoURL == enterpriseRepoURL {
+					repoName = "mattermost/enterprise"
+				}
+				fmt.Printf("Error getting PRs from %s: %v\n", repoName, err)
+			} else {
+				prs = append(prs, milePRs...)
+			}
+		}
+	} else if repoChoice == 6 {
 		// For "all repositories", we need to find all instances of this milestone name in all repos
 		// Get unified milestones again
 		mmMilestones, _ := getMilestones(mattermostRepoURL)

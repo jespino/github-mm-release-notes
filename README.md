@@ -52,7 +52,7 @@ If your GitHub organization uses SAML SSO (Single Sign-On):
    **Important:** If you don't provide a GitHub token, the tool will run as an unauthenticated user. This will work for the public Mattermost repository, but you **won't be able to access** the private Enterprise repository.
 
 3. Follow the interactive prompts:
-   - Select a repository (mattermost/mattermost, mattermost/enterprise, mattermost/mattermost-mobile, mattermost/mattermost-desktop, or all)
+   - Select a repository (mattermost/mattermost, mattermost/enterprise, mattermost/mattermost-mobile, mattermost/mattermost-desktop, mattermost/mattermost + mattermost/enterprise, or all)
    - Select a milestone from the displayed list
    - The tool will display all PRs with the "release-note" label in that milestone
 
