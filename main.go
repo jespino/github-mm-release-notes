@@ -37,7 +37,7 @@ type Milestone struct {
 func unifyMilestonesByName(milestoneSets ...[]Milestone) []UnifiedMilestone {
 	// Map to hold milestones by title
 	milestoneMap := make(map[string]*UnifiedMilestone)
-	
+
 	// Process all milestone sets
 	for _, milestoneSet := range milestoneSets {
 		for _, milestone := range milestoneSet {
@@ -54,13 +54,13 @@ func unifyMilestonesByName(milestoneSets ...[]Milestone) []UnifiedMilestone {
 			}
 		}
 	}
-	
+
 	// Convert map to slice
 	result := make([]UnifiedMilestone, 0, len(milestoneMap))
 	for _, unified := range milestoneMap {
 		result = append(result, *unified)
 	}
-	
+
 	return result
 }
 
@@ -88,7 +88,7 @@ const (
 	mattermostRepoURL = "https://api.github.com/repos/mattermost/mattermost"
 	enterpriseRepoURL = "https://api.github.com/repos/mattermost/enterprise"
 	mobileRepoURL     = "https://api.github.com/repos/mattermost/mattermost-mobile"
-	desktopRepoURL    = "https://api.github.com/repos/mattermost/mattermost-desktop"
+	desktopRepoURL    = "https://api.github.com/repos/mattermost/desktop"
 	defaultAuthToken  = "" // Default token, lowest priority
 )
 
@@ -126,12 +126,12 @@ func getGitHubToken() string {
 func main() {
 	// Get GitHub token from available sources
 	authToken = getGitHubToken()
-	
+
 	if authToken == "" {
 		fmt.Println("Warning: No GitHub token found. Access to private repositories will fail.")
 	} else {
 		tokenLength := len(authToken)
-		fmt.Printf("Using GitHub token (last 4 chars: %s)\n", 
+		fmt.Printf("Using GitHub token (last 4 chars: %s)\n",
 			authToken[max(0, tokenLength-4):tokenLength])
 	}
 	// Select repository
@@ -139,7 +139,7 @@ func main() {
 	fmt.Println("1: mattermost/mattermost")
 	fmt.Println("2: mattermost/enterprise")
 	fmt.Println("3: mattermost/mattermost-mobile")
-	fmt.Println("4: mattermost/mattermost-desktop")
+	fmt.Println("4: mattermost/desktop")
 	fmt.Println("5: mattermost/mattermost + mattermost/enterprise")
 	fmt.Println("6: All repositories")
 
@@ -173,7 +173,7 @@ func main() {
 		milestones, err = getMilestones(repoURL)
 	case 4:
 		repoURL = desktopRepoURL
-		repoName = "mattermost/mattermost-desktop"
+		repoName = "mattermost/desktop"
 		milestones, err = getMilestones(repoURL)
 	case 5:
 		// Get milestones from mattermost and enterprise repositories
@@ -198,17 +198,17 @@ func main() {
 		}
 
 		repoName = "mattermost/mattermost + mattermost/enterprise"
-		
+
 		// Create unified milestones by name
 		unifiedMilestones := unifyMilestonesByName(mmMilestones, entMilestones)
-		
+
 		// Convert back to simple milestones for display and selection
 		for _, um := range unifiedMilestones {
 			// Use the first milestone as the representative for this name
 			representative := um.Milestones[0]
 			milestones = append(milestones, representative)
 		}
-		
+
 		err = nil
 	case 6:
 		// Get milestones from all repositories and combine them
@@ -231,7 +231,7 @@ func main() {
 		for i := range entMilestones {
 			entMilestones[i].RepoURL = enterpriseRepoURL
 		}
-		
+
 		mobileMilestones, err3 := getMilestones(mobileRepoURL)
 		if err3 != nil {
 			fmt.Printf("Error getting milestones from mattermost/mattermost-mobile: %v\n", err3)
@@ -241,10 +241,10 @@ func main() {
 		for i := range mobileMilestones {
 			mobileMilestones[i].RepoURL = mobileRepoURL
 		}
-		
+
 		desktopMilestones, err4 := getMilestones(desktopRepoURL)
 		if err4 != nil {
-			fmt.Printf("Error getting milestones from mattermost/mattermost-desktop: %v\n", err4)
+			fmt.Printf("Error getting milestones from mattermost/desktop: %v\n", err4)
 			return
 		}
 		// Add repo URL to each milestone
@@ -253,17 +253,17 @@ func main() {
 		}
 
 		repoName = "all repositories"
-		
+
 		// Create unified milestones by name
 		unifiedMilestones := unifyMilestonesByName(mmMilestones, entMilestones, mobileMilestones, desktopMilestones)
-		
+
 		// Convert back to simple milestones for display and selection
 		for _, um := range unifiedMilestones {
 			// Use the first milestone as the representative for this name
 			representative := um.Milestones[0]
 			milestones = append(milestones, representative)
 		}
-		
+
 		err = nil
 	}
 
@@ -305,14 +305,14 @@ func main() {
 		for i := range mmMilestones {
 			mmMilestones[i].RepoURL = mattermostRepoURL
 		}
-		
+
 		entMilestones, _ := getMilestones(enterpriseRepoURL)
 		for i := range entMilestones {
 			entMilestones[i].RepoURL = enterpriseRepoURL
 		}
-		
+
 		unifiedMilestones := unifyMilestonesByName(mmMilestones, entMilestones)
-		
+
 		// Find the unified milestone that matches our selection
 		var targetMilestones []Milestone
 		for _, um := range unifiedMilestones {
@@ -321,7 +321,7 @@ func main() {
 				break
 			}
 		}
-		
+
 		// Fetch PRs for each matching milestone
 		for _, milestone := range targetMilestones {
 			milePRs, err := getPRsWithReleaseNotes(milestone.RepoURL, milestone.Number)
@@ -342,24 +342,24 @@ func main() {
 		for i := range mmMilestones {
 			mmMilestones[i].RepoURL = mattermostRepoURL
 		}
-		
+
 		entMilestones, _ := getMilestones(enterpriseRepoURL)
 		for i := range entMilestones {
 			entMilestones[i].RepoURL = enterpriseRepoURL
 		}
-		
+
 		mobileMilestones, _ := getMilestones(mobileRepoURL)
 		for i := range mobileMilestones {
 			mobileMilestones[i].RepoURL = mobileRepoURL
 		}
-		
+
 		desktopMilestones, _ := getMilestones(desktopRepoURL)
 		for i := range desktopMilestones {
 			desktopMilestones[i].RepoURL = desktopRepoURL
 		}
-		
+
 		unifiedMilestones := unifyMilestonesByName(mmMilestones, entMilestones, mobileMilestones, desktopMilestones)
-		
+
 		// Find the unified milestone that matches our selection
 		var targetMilestones []Milestone
 		for _, um := range unifiedMilestones {
@@ -368,7 +368,7 @@ func main() {
 				break
 			}
 		}
-		
+
 		// Fetch PRs for each matching milestone
 		for _, milestone := range targetMilestones {
 			milePRs, err := getPRsWithReleaseNotes(milestone.RepoURL, milestone.Number)
@@ -379,7 +379,7 @@ func main() {
 				} else if milestone.RepoURL == mobileRepoURL {
 					repoName = "mattermost/mattermost-mobile"
 				} else if milestone.RepoURL == desktopRepoURL {
-					repoName = "mattermost/mattermost-desktop"
+					repoName = "mattermost/desktop"
 				}
 				fmt.Printf("Error getting PRs from %s: %v\n", repoName, err)
 			} else {
@@ -434,7 +434,7 @@ func getMilestones(repoURL string) ([]Milestone, error) {
 		// Read error response body for more details
 		errorBody := make([]byte, 1024)
 		n, _ := resp.Body.Read(errorBody)
-		return nil, fmt.Errorf("API responded with code: %d for URL %s - Response: %s", 
+		return nil, fmt.Errorf("API responded with code: %d for URL %s - Response: %s",
 			resp.StatusCode, url, string(errorBody[:n]))
 	}
 
@@ -471,7 +471,7 @@ func getPRsWithReleaseNotes(repoURL string, milestoneID int) ([]PullRequest, err
 		// Read error response body for more details
 		errorBody := make([]byte, 1024)
 		n, _ := resp.Body.Read(errorBody)
-		return nil, fmt.Errorf("API responded with code: %d for URL %s - Response: %s", 
+		return nil, fmt.Errorf("API responded with code: %d for URL %s - Response: %s",
 			resp.StatusCode, url, string(errorBody[:n]))
 	}
 
