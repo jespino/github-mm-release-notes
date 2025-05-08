@@ -47,11 +47,17 @@ If your GitHub organization uses SAML SSO (Single Sign-On):
    github-mm-release-notes
    ```
 
-   **Format output for Claude AI:**
+   **Use Claude AI to format release notes:**
    ```
+   github-mm-release-notes --token=YOUR_TOKEN_HERE --claude --claudetoken=YOUR_ANTHROPIC_API_KEY
+   ```
+   This will send the release notes to Anthropic's Claude AI to organize and polish them into categories.
+   
+   You can also set your Anthropic API key as an environment variable:
+   ```
+   export ANTHROPIC_API_KEY=YOUR_ANTHROPIC_API_KEY
    github-mm-release-notes --token=YOUR_TOKEN_HERE --claude
    ```
-   This will format the output with instructions for Claude AI to organize and polish the release notes into categories.
 
    **Note:** The tool will fall back to using any token stored in the code (if any), but this is not recommended.
    

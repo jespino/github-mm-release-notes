@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -10,6 +11,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/anthropics/anthropic-sdk-go"
 )
 
 // Mattermost Release Notes Extractor
@@ -105,6 +108,7 @@ func max(x, y int) int {
 // Global flags
 var (
 	useClaudeFormat bool
+	claudeToken     string
 )
 
 // getGitHubToken returns the GitHub API token from available sources in order of precedence:
@@ -114,7 +118,8 @@ var (
 func getGitHubToken() string {
 	var flagToken string
 	flag.StringVar(&flagToken, "token", "", "GitHub API token")
-	flag.BoolVar(&useClaudeFormat, "claude", false, "Format output for Claude AI processing")
+	flag.BoolVar(&useClaudeFormat, "claude", false, "Use Claude AI to format release notes into categories")
+	flag.StringVar(&claudeToken, "claudetoken", "", "Anthropic API token for Claude AI")
 	flag.Parse()
 
 	// Check sources in order of precedence
@@ -408,14 +413,31 @@ func main() {
 	}
 
 	if useClaudeFormat {
-		// Format output for Claude AI
-		fmt.Println("Please remove the PR numbers and ticket titles. Then, please polish each release note and organize them into categories. The categories are: Compatibility, Important Upgrade Notes, User Interface (UI) Improvements, Administration Improvements, Performance Improvements, Bug Fixes, config.json Changes, API Changes, Websocket Event Changes, Database Changes, Go Version Updates and Breaking Changes.")
-		fmt.Println("\nRelease notes:")
+		if claudeToken == "" {
+			claudeToken = os.Getenv("ANTHROPIC_API_KEY")
+			if claudeToken == "" {
+				fmt.Println("No Anthropic API token provided. Set one with --claudetoken flag or ANTHROPIC_API_KEY environment variable.")
+				return
+			}
+		}
+
+		// Build input for Claude AI
+		var releaseNotesBuffer bytes.Buffer
 		for _, pr := range prs {
 			releaseNote := extractReleaseNote(pr.Body)
-			fmt.Printf("PR #%d: %s\n", pr.Number, pr.Title)
-			fmt.Printf("%s\n\n", releaseNote)
+			releaseNotesBuffer.WriteString(fmt.Sprintf("PR #%d: %s\n", pr.Number, pr.Title))
+			releaseNotesBuffer.WriteString(fmt.Sprintf("%s\n\n", releaseNote))
 		}
+
+		// Send to Claude API for formatting
+		formattedNotes, err := formatReleaseNotesWithClaude(claudeToken, releaseNotesBuffer.String(), selectedMilestone.Title)
+		if err != nil {
+			fmt.Printf("Error using Claude to format release notes: %v\n", err)
+			return
+		}
+
+		// Print the formatted notes
+		fmt.Println(formattedNotes)
 	} else {
 		// Standard output format
 		fmt.Printf("PRs with release notes in milestone %s:\n\n", selectedMilestone.Title)
@@ -507,6 +529,58 @@ func getPRsWithReleaseNotes(repoURL string, milestoneID int) ([]PullRequest, err
 	}
 
 	return pullRequests, nil
+}
+
+// formatReleaseNotesWithClaude sends the release notes to Anthropic's Claude API
+// and returns the formatted version organized by categories
+func formatReleaseNotesWithClaude(apiKey string, releaseNotes string, milestoneName string) (string, error) {
+	client := anthropic.NewClient(apiKey)
+
+	// Prepare the prompt for Claude
+	prompt := fmt.Sprintf(`Here are the raw release notes for Mattermost milestone %s:
+
+%s
+
+Please remove the PR numbers and ticket titles. Then, please polish each release note and organize them into categories. The categories are:
+- Compatibility
+- Important Upgrade Notes
+- User Interface (UI) Improvements
+- Administration Improvements 
+- Performance Improvements
+- Bug Fixes
+- config.json Changes
+- API Changes
+- Websocket Event Changes
+- Database Changes
+- Go Version Updates
+- Breaking Changes
+
+Only include categories that have at least one entry. Format your response as markdown.`, milestoneName, releaseNotes)
+
+	// Set up the message request
+	req := &anthropic.MessageRequest{
+		Model:     anthropic.Claude3Opus,
+		MaxTokens: 4000,
+		Messages: []anthropic.Message{
+			{
+				Role:    "user",
+				Content: prompt,
+			},
+		},
+	}
+
+	// Send the request to Claude
+	resp, err := client.Messages(req)
+	if err != nil {
+		return "", fmt.Errorf("error calling Claude API: %w", err)
+	}
+
+	// Extract the response text
+	if len(resp.Content) == 0 {
+		return "", fmt.Errorf("received empty response from Claude API")
+	}
+
+	return resp.Content[0].Text, nil
 }
 
 // Extracts the release note section from the PR description
