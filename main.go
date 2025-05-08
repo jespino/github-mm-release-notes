@@ -102,6 +102,11 @@ func max(x, y int) int {
 	return y
 }
 
+// Global flags
+var (
+	useClaudeFormat bool
+)
+
 // getGitHubToken returns the GitHub API token from available sources in order of precedence:
 // 1. Command-line flag
 // 2. Environment variable
@@ -109,6 +114,7 @@ func max(x, y int) int {
 func getGitHubToken() string {
 	var flagToken string
 	flag.StringVar(&flagToken, "token", "", "GitHub API token")
+	flag.BoolVar(&useClaudeFormat, "claude", false, "Format output for Claude AI processing")
 	flag.Parse()
 
 	// Check sources in order of precedence
@@ -401,11 +407,23 @@ func main() {
 		return
 	}
 
-	fmt.Printf("PRs with release notes in milestone %s:\n\n", selectedMilestone.Title)
-	for _, pr := range prs {
-		releaseNote := extractReleaseNote(pr.Body)
-		fmt.Printf("PR #%d: %s\n", pr.Number, pr.Title)
-		fmt.Printf("Release Note: %s\n\n", releaseNote)
+	if useClaudeFormat {
+		// Format output for Claude AI
+		fmt.Println("Please remove the PR numbers and ticket titles. Then, please polish each release note and organize them into categories. The categories are: Compatibility, Important Upgrade Notes, User Interface (UI) Improvements, Administration Improvements, Performance Improvements, Bug Fixes, config.json Changes, API Changes, Websocket Event Changes, Database Changes, Go Version Updates and Breaking Changes.")
+		fmt.Println("\nRelease notes:")
+		for _, pr := range prs {
+			releaseNote := extractReleaseNote(pr.Body)
+			fmt.Printf("PR #%d: %s\n", pr.Number, pr.Title)
+			fmt.Printf("%s\n\n", releaseNote)
+		}
+	} else {
+		// Standard output format
+		fmt.Printf("PRs with release notes in milestone %s:\n\n", selectedMilestone.Title)
+		for _, pr := range prs {
+			releaseNote := extractReleaseNote(pr.Body)
+			fmt.Printf("PR #%d: %s\n", pr.Number, pr.Title)
+			fmt.Printf("Release Note: %s\n\n", releaseNote)
+		}
 	}
 }
 

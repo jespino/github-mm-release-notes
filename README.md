@@ -47,6 +47,12 @@ If your GitHub organization uses SAML SSO (Single Sign-On):
    github-mm-release-notes
    ```
 
+   **Format output for Claude AI:**
+   ```
+   github-mm-release-notes --token=YOUR_TOKEN_HERE --claude
+   ```
+   This will format the output with instructions for Claude AI to organize and polish the release notes into categories.
+
    **Note:** The tool will fall back to using any token stored in the code (if any), but this is not recommended.
    
    **Important:** If you don't provide a GitHub token, the tool will run as an unauthenticated user. This will work for the public Mattermost repository, but you **won't be able to access** the private Enterprise repository.
