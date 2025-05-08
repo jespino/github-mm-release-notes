@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -13,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/anthropics/anthropic-sdk-go"
+	"github.com/anthropics/anthropic-sdk-go/option"
 )
 
 // Mattermost Release Notes Extractor
@@ -534,7 +536,7 @@ func getPRsWithReleaseNotes(repoURL string, milestoneID int) ([]PullRequest, err
 // formatReleaseNotesWithClaude sends the release notes to Anthropic's Claude API
 // and returns the formatted version organized by categories
 func formatReleaseNotesWithClaude(apiKey string, releaseNotes string, milestoneName string) (string, error) {
-	client := anthropic.NewClient(anthropic.WithAPIKey(apiKey))
+	client := anthropic.NewClient(option.WithAPIKey(apiKey))
 
 	// Prepare the prompt for Claude
 	prompt := fmt.Sprintf(`Here are the raw release notes for Mattermost milestone %s:
@@ -557,25 +559,24 @@ Please remove the PR numbers and ticket titles. Then, please polish each release
 
 Only include categories that have at least one entry. Format your response as markdown.`, milestoneName, releaseNotes)
 
-	// Send the request to Claude using the right API version
-	resp, err := client.Messages.Create(
-		&anthropic.MessageCreateParams{
-			Model:    "claude-3-opus-20240229",
-			MaxTokens: 4000,
-			System:   "You organize release notes into categories like: Compatibility, Important Upgrade Notes, UI Improvements, etc.",
-			Messages: []anthropic.Message{
-				{
-					Role:    "user",
-					Content: []anthropic.ContentBlock{
-						anthropic.TextBlock{
-							Type: "text",
+	// Send the request to Claude
+	resp, err := client.Messages.New(context.Background(), anthropic.MessageNewParams{
+		Model:     "claude-3-opus-20240229",
+		MaxTokens: 4000,
+		System:    "You organize release notes into categories like: Compatibility, Important Upgrade Notes, UI Improvements, etc.",
+		Messages: []anthropic.MessageParam{
+			{
+				Role: anthropic.MessageParamRoleUser,
+				Content: []anthropic.ContentBlockParamUnion{
+					{
+						OfRequestTextBlock: &anthropic.TextBlockParam{
 							Text: prompt,
 						},
 					},
 				},
 			},
 		},
-	)
+	})
 
 	if err != nil {
 		return "", fmt.Errorf("error calling Claude API: %w", err)
@@ -586,13 +587,19 @@ Only include categories that have at least one entry. Format your response as ma
 		return "", fmt.Errorf("received empty response from Claude API")
 	}
 
-	// Extract text from the content block
-	textBlock, ok := resp.Content[0].GetTextBlock()
-	if !ok {
-		return "", fmt.Errorf("could not parse text response from Claude API")
+	// Extract text from the response
+	var responseText string
+	for _, block := range resp.Content {
+		if textBlock, ok := block.AsAny().(anthropic.TextBlock); ok {
+			responseText += textBlock.Text
+		}
 	}
 
-	return textBlock.Text, nil
+	if responseText == "" {
+		return "", fmt.Errorf("could not find text response from Claude API")
+	}
+
+	return responseText, nil
 }
 
 // Extracts the release note section from the PR description
