@@ -87,6 +87,8 @@ type PullRequest struct {
 const (
 	mattermostRepoURL = "https://api.github.com/repos/mattermost/mattermost"
 	enterpriseRepoURL = "https://api.github.com/repos/mattermost/enterprise"
+	mobileRepoURL     = "https://api.github.com/repos/mattermost/mattermost-mobile"
+	desktopRepoURL    = "https://api.github.com/repos/mattermost/mattermost-desktop"
 	defaultAuthToken  = "" // Default token, lowest priority
 )
 
@@ -136,15 +138,17 @@ func main() {
 	fmt.Println("Select a repository:")
 	fmt.Println("1: mattermost/mattermost")
 	fmt.Println("2: mattermost/enterprise")
-	fmt.Println("3: Both")
+	fmt.Println("3: mattermost/mattermost-mobile")
+	fmt.Println("4: mattermost/mattermost-desktop")
+	fmt.Println("5: All repositories")
 
 	reader := bufio.NewReader(os.Stdin)
-	fmt.Print("\nSelect an option (1-3): ")
+	fmt.Print("\nSelect an option (1-5): ")
 	repoInput, _ := reader.ReadString('\n')
 	repoInput = strings.TrimSpace(repoInput)
 
 	repoChoice, err := strconv.Atoi(repoInput)
-	if err != nil || repoChoice < 1 || repoChoice > 3 {
+	if err != nil || repoChoice < 1 || repoChoice > 5 {
 		fmt.Println("Invalid selection")
 		return
 	}
@@ -163,7 +167,15 @@ func main() {
 		repoName = "mattermost/enterprise"
 		milestones, err = getMilestones(repoURL)
 	case 3:
-		// Get milestones from both repositories and combine them
+		repoURL = mobileRepoURL
+		repoName = "mattermost/mattermost-mobile"
+		milestones, err = getMilestones(repoURL)
+	case 4:
+		repoURL = desktopRepoURL
+		repoName = "mattermost/mattermost-desktop"
+		milestones, err = getMilestones(repoURL)
+	case 5:
+		// Get milestones from all repositories and combine them
 		mmMilestones, err1 := getMilestones(mattermostRepoURL)
 		if err1 != nil {
 			fmt.Printf("Error getting milestones from mattermost/mattermost: %v\n", err1)
@@ -183,11 +195,31 @@ func main() {
 		for i := range entMilestones {
 			entMilestones[i].RepoURL = enterpriseRepoURL
 		}
+		
+		mobileMilestones, err3 := getMilestones(mobileRepoURL)
+		if err3 != nil {
+			fmt.Printf("Error getting milestones from mattermost/mattermost-mobile: %v\n", err3)
+			return
+		}
+		// Add repo URL to each milestone
+		for i := range mobileMilestones {
+			mobileMilestones[i].RepoURL = mobileRepoURL
+		}
+		
+		desktopMilestones, err4 := getMilestones(desktopRepoURL)
+		if err4 != nil {
+			fmt.Printf("Error getting milestones from mattermost/mattermost-desktop: %v\n", err4)
+			return
+		}
+		// Add repo URL to each milestone
+		for i := range desktopMilestones {
+			desktopMilestones[i].RepoURL = desktopRepoURL
+		}
 
-		repoName = "both repositories"
+		repoName = "all repositories"
 		
 		// Create unified milestones by name
-		unifiedMilestones := unifyMilestonesByName(mmMilestones, entMilestones)
+		unifiedMilestones := unifyMilestonesByName(mmMilestones, entMilestones, mobileMilestones, desktopMilestones)
 		
 		// Convert back to simple milestones for display and selection
 		for _, um := range unifiedMilestones {
@@ -230,8 +262,8 @@ func main() {
 	// Get PRs with "release-note" label for the selected milestone
 	var prs []PullRequest
 
-	if repoChoice == 3 {
-		// For "both repositories", we need to find all instances of this milestone name in all repos
+	if repoChoice == 5 {
+		// For "all repositories", we need to find all instances of this milestone name in all repos
 		// Get unified milestones again
 		mmMilestones, _ := getMilestones(mattermostRepoURL)
 		for i := range mmMilestones {
@@ -243,7 +275,17 @@ func main() {
 			entMilestones[i].RepoURL = enterpriseRepoURL
 		}
 		
-		unifiedMilestones := unifyMilestonesByName(mmMilestones, entMilestones)
+		mobileMilestones, _ := getMilestones(mobileRepoURL)
+		for i := range mobileMilestones {
+			mobileMilestones[i].RepoURL = mobileRepoURL
+		}
+		
+		desktopMilestones, _ := getMilestones(desktopRepoURL)
+		for i := range desktopMilestones {
+			desktopMilestones[i].RepoURL = desktopRepoURL
+		}
+		
+		unifiedMilestones := unifyMilestonesByName(mmMilestones, entMilestones, mobileMilestones, desktopMilestones)
 		
 		// Find the unified milestone that matches our selection
 		var targetMilestones []Milestone
@@ -261,6 +303,10 @@ func main() {
 				repoName := "mattermost/mattermost"
 				if milestone.RepoURL == enterpriseRepoURL {
 					repoName = "mattermost/enterprise"
+				} else if milestone.RepoURL == mobileRepoURL {
+					repoName = "mattermost/mattermost-mobile"
+				} else if milestone.RepoURL == desktopRepoURL {
+					repoName = "mattermost/mattermost-desktop"
 				}
 				fmt.Printf("Error getting PRs from %s: %v\n", repoName, err)
 			} else {
