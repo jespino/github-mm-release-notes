@@ -432,7 +432,7 @@ func main() {
 		}
 
 		// Send to Claude API for formatting
-		formattedNotes, err := formatReleaseNotesWithClaude(claudeToken, releaseNotesBuffer.String(), selectedMilestone.Title)
+		formattedNotes, err := formatReleaseNotesWithClaude(claudeToken, releaseNotesBuffer.String(), selectedMilestone.Title, repoName == "mattermost/mattermost-mobile")
 		if err != nil {
 			fmt.Printf("Error using Claude to format release notes: %v\n", err)
 			return
@@ -535,7 +535,7 @@ func getPRsWithReleaseNotes(repoURL string, milestoneID int) ([]PullRequest, err
 
 // formatReleaseNotesWithClaude sends the release notes to Anthropic's Claude API
 // and returns the formatted version organized by categories
-func formatReleaseNotesWithClaude(apiKey string, releaseNotes string, milestoneName string) (string, error) {
+func formatReleaseNotesWithClaude(apiKey string, releaseNotes string, milestoneName string, isMobile bool) (string, error) {
 	client := anthropic.NewClient(option.WithAPIKey(apiKey))
 
 	// Prepare the prompt for Claude
@@ -543,7 +543,7 @@ func formatReleaseNotesWithClaude(apiKey string, releaseNotes string, milestoneN
 
 %s
 
-Please remove the PR numbers and ticket titles. Then, please polish each release note and organize them into categories. The categories are:
+Please remove the PR numbers and ticket titles. Then, please turn each release note into clear sentences and organize them into categories. The categories are: 
 - Compatibility
 - Important Upgrade Notes
 - User Interface (UI) Improvements
@@ -559,11 +559,25 @@ Please remove the PR numbers and ticket titles. Then, please polish each release
 
 Only include categories that have at least one entry. Format your response as markdown.`, milestoneName, releaseNotes)
 
+	if isMobile {
+		prompt = fmt.Sprintf(`Here are the raw release notes for Mattermost milestone %s:
+
+%s
+
+Please remove the PR numbers and ticket titles. Then, please turn each release note into clear sentences and organize them into categories. The categories are:
+	- Compatibility
+	- Important Upgrade Notes
+	- Improvements
+	- Bug Fixes
+
+Only include categories that have at least one entry. Format your response as markdown.`, milestoneName, releaseNotes)
+	}
+
 	// Send the request to Claude
 	resp, err := client.Messages.New(context.Background(), anthropic.MessageNewParams{
 		Model:     "claude-3-opus-20240229",
 		MaxTokens: 4000,
-		System:    []anthropic.TextBlockParam{
+		System: []anthropic.TextBlockParam{
 			{Text: "You organize release notes into categories like: Compatibility, Important Upgrade Notes, UI Improvements, etc."},
 		},
 		Messages: []anthropic.MessageParam{
