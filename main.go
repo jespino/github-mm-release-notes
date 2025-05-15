@@ -431,8 +431,15 @@ func main() {
 			releaseNotesBuffer.WriteString(fmt.Sprintf("%s\n\n", releaseNote))
 		}
 
+		changeLogType := "mattermost"
+		if repoName == "mattermost/mattermost-mobile" {
+			changeLogType = "mobile"
+		} else if repoName == "mattermost/desktop" {
+			changeLogType = "desktop"
+		}
+
 		// Send to Claude API for formatting
-		formattedNotes, err := formatReleaseNotesWithClaude(claudeToken, releaseNotesBuffer.String(), selectedMilestone.Title, repoName == "mattermost/mattermost-mobile")
+		formattedNotes, err := formatReleaseNotesWithClaude(claudeToken, releaseNotesBuffer.String(), selectedMilestone.Title, changeLogType)
 		if err != nil {
 			fmt.Printf("Error using Claude to format release notes: %v\n", err)
 			return
@@ -535,7 +542,7 @@ func getPRsWithReleaseNotes(repoURL string, milestoneID int) ([]PullRequest, err
 
 // formatReleaseNotesWithClaude sends the release notes to Anthropic's Claude API
 // and returns the formatted version organized by categories
-func formatReleaseNotesWithClaude(apiKey string, releaseNotes string, milestoneName string, isMobile bool) (string, error) {
+func formatReleaseNotesWithClaude(apiKey string, releaseNotes string, milestoneName string, changeLogType string) (string, error) {
 	client := anthropic.NewClient(option.WithAPIKey(apiKey))
 
 	// Prepare the prompt for Claude
@@ -559,7 +566,7 @@ Please remove the PR numbers and ticket titles. Then, please turn each release n
 
 Only include categories that have at least one entry. Format your response as markdown.`, milestoneName, releaseNotes)
 
-	if isMobile {
+	if changeLogType == "mobile" {
 		prompt = fmt.Sprintf(`Here are the raw release notes for Mattermost milestone %s:
 
 %s
@@ -569,6 +576,20 @@ Please remove the PR numbers and ticket titles. Then, please turn each release n
 	- Important Upgrade Notes
 	- Improvements
 	- Bug Fixes
+
+Only include categories that have at least one entry. Format your response as markdown.`, milestoneName, releaseNotes)
+	}
+
+	if changeLogType == "desktop" {
+		prompt = fmt.Sprintf(`Here are the raw release notes for Mattermost milestone %s:
+
+%s
+
+Please remove the PR numbers and ticket titles. Then, please turn each release note into clear sentences and organize them into categories. The categories are:
+	- Compatibility
+	- Improvements
+	- Architectural Changes
+	- Bug Fixes.
 
 Only include categories that have at least one entry. Format your response as markdown.`, milestoneName, releaseNotes)
 	}
